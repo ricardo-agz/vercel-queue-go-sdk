@@ -18,7 +18,7 @@ type emailPayload struct {
 
 var emails = NewTopic[emailPayload]("emails")
 
-func TestTopicSend(t *testing.T) {
+func TestPublisherSend(t *testing.T) {
 	var gotAuth, gotIdem, gotDelay string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || !strings.HasSuffix(r.URL.Path, "/api/v3/topic/emails") {
@@ -33,7 +33,7 @@ func TestTopicSend(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(WithBaseURL(srv.URL), WithToken("tok"), WithoutDeploymentPinning())
-	res, err := emails.Send(context.Background(), client, emailPayload{To: "a@b.com"},
+	res, err := emails.With(client).Send(context.Background(), emailPayload{To: "a@b.com"},
 		WithIdempotencyKey("k1"), WithDelay(60*time.Second))
 	if err != nil {
 		t.Fatalf("send: %v", err)
@@ -59,7 +59,7 @@ func TestSendDuplicateIdempotencyKey(t *testing.T) {
 	defer srv.Close()
 
 	client := NewClient(WithBaseURL(srv.URL), WithToken("tok"), WithoutDeploymentPinning())
-	_, err := emails.Send(context.Background(), client, emailPayload{To: "a@b.com"})
+	_, err := emails.With(client).Send(context.Background(), emailPayload{To: "a@b.com"})
 	if !errors.Is(err, ErrDuplicateIdempotencyKey) {
 		t.Fatalf("err = %v, want ErrDuplicateIdempotencyKey", err)
 	}
@@ -237,5 +237,68 @@ func TestClassify(t *testing.T) {
 	}
 	if d, _ := classify(errors.New("x")); d != dispositionRetry {
 		t.Errorf("plain error should retry")
+	}
+}
+
+// sendCaptureServer returns a test server that records the Authorization header
+// and replies with a created message, plus a cleanup via t.Cleanup.
+func sendCaptureServer(t *testing.T, gotAuth *string) *httptest.Server {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		*gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]string{"messageId": "m1"})
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestTopicSendUsesContextToken(t *testing.T) {
+	var gotAuth string
+	srv := sendCaptureServer(t, &gotAuth)
+	t.Setenv("VERCEL_QUEUE_BASE_URL", srv.URL)
+
+	ctx := ContextWithToken(context.Background(), "ctx-tok")
+	res, err := emails.Send(ctx, emailPayload{To: "a@b.com"})
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	if res.MessageID != "m1" {
+		t.Errorf("messageId = %q", res.MessageID)
+	}
+	if gotAuth != "Bearer ctx-tok" {
+		t.Errorf("auth = %q, want Bearer ctx-tok", gotAuth)
+	}
+}
+
+func TestMiddlewareSeedsContextToken(t *testing.T) {
+	var gotAuth string
+	srv := sendCaptureServer(t, &gotAuth)
+	t.Setenv("VERCEL_QUEUE_BASE_URL", srv.URL)
+
+	handler := Middleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		if _, err := emails.Send(r.Context(), emailPayload{To: "a@b.com"}); err != nil {
+			t.Errorf("send from handler: %v", err)
+		}
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/checkout", nil)
+	req.Header.Set("X-Vercel-Oidc-Token", "mw-tok")
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	if gotAuth != "Bearer mw-tok" {
+		t.Errorf("auth = %q, want Bearer mw-tok", gotAuth)
+	}
+}
+
+func TestSendNoTokenReturnsActionableError(t *testing.T) {
+	t.Setenv("VERCEL_QUEUE_TOKEN", "")
+	t.Setenv("VERCEL_OIDC_TOKEN", "")
+
+	_, err := emails.Send(context.Background(), emailPayload{To: "a@b.com"})
+	if !errors.Is(err, ErrNoToken) {
+		t.Fatalf("err = %v, want ErrNoToken", err)
+	}
+	if !strings.Contains(err.Error(), "queue.Middleware") {
+		t.Errorf("error should be actionable, got: %v", err)
 	}
 }

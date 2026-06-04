@@ -79,7 +79,12 @@ func resolveToken(ctx context.Context, override string) (string, error) {
 	if v := os.Getenv(envOIDCToken); v != "" {
 		return v, nil
 	}
-	return "", &Error{Op: "auth", err: ErrNoToken}
+	return "", &Error{
+		Op:  "auth",
+		err: ErrNoToken,
+		Message: "pass the inbound request context (e.g. r.Context()) so the Vercel OIDC token is used, " +
+			"or wrap your handler with queue.Middleware; for local development set VERCEL_QUEUE_TOKEN",
+	}
 }
 
 // deploymentPinningDisabled reports whether deployment IDs should be omitted.

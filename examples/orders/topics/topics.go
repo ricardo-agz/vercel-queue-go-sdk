@@ -3,7 +3,7 @@
 // payload type a single source of truth.
 package topics
 
-import "github.com/vercel/queue-go"
+import queue "github.com/ricardo-agz/vercel-queue-go-sdk"
 
 // EmailPayload is the message body for the emails topic.
 type EmailPayload struct {

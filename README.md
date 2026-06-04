@@ -30,17 +30,36 @@ var Emails = queue.NewTopic[EmailPayload]("emails")
 
 ## Producing
 
-```go
-client := queue.NewClient() // configured from the environment
+Publish from an HTTP handler using the inbound request's context. On Vercel the
+Queue Service is authenticated with the per-request OIDC token, which
+`queue.Middleware` copies from the `X-Vercel-Oidc-Token` header into the request
+context — so pass `r.Context()` and there is no client to construct or thread:
 
-_, err := Emails.Send(ctx, client, EmailPayload{To: "a@b.com"},
-    queue.WithDelay(time.Minute),
-    queue.WithIdempotencyKey("order-123"),
-)
+```go
+func handleCheckout(w http.ResponseWriter, r *http.Request) {
+    _, err := Emails.Send(r.Context(), EmailPayload{To: "a@b.com"},
+        queue.WithDelay(time.Minute),
+        queue.WithIdempotencyKey("order-123"),
+    )
+    // ...
+}
+
+func main() {
+    mux := http.NewServeMux()
+    mux.HandleFunc("POST /checkout", handleCheckout)
+    log.Fatal(http.ListenAndServe(":"+port(), queue.Middleware(mux)))
+}
 ```
 
-`client.Send(ctx, "emails", anyPayload, ...)` is available as a low-level,
-untyped escape hatch.
+Need a custom client (base URL, HTTP client, deployment pinning)? Bind one with
+`Emails.With(client)`, which returns a reusable `*queue.Publisher[EmailPayload]`:
+
+```go
+pub := Emails.With(client) // store on a struct, inject into constructors, mock in tests
+_, err := pub.Send(ctx, EmailPayload{To: "a@b.com"})
+```
+
+`client.Send(ctx, "emails", anyPayload, ...)` remains as a low-level untyped call.
 
 ## Consuming
 
@@ -97,7 +116,7 @@ Only the consumer (worker) service declares topics; the producer just publishes.
     "web":    { 
       "runtime": "go", 
       "entrypoint": "cmd/server/main.go", 
-      "route": "/" 
+      "mount": "/" 
     },
     "worker": {
       "type": "job",

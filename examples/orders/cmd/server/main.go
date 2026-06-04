@@ -8,20 +8,20 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/vercel/queue-go"
-	"github.com/vercel/queue-go/examples/orders/topics"
+	queue "github.com/ricardo-agz/vercel-queue-go-sdk"
+	"github.com/ricardo-agz/vercel-queue-go-sdk/examples/orders/topics"
 )
 
 func main() {
-	client := queue.NewClient()
-
 	http.HandleFunc("GET /", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(indexHTML))
 	})
 
 	http.HandleFunc("POST /checkout", func(w http.ResponseWriter, r *http.Request) {
-		res, err := topics.Emails.Send(r.Context(), client, topics.EmailPayload{
+		// Token comes from r.Context() (seeded by queue.Middleware below); no
+		// client to construct or thread.
+		res, err := topics.Emails.Send(r.Context(), topics.EmailPayload{
 			To:      "customer@example.com",
 			Subject: "Your order is confirmed",
 		}, queue.WithIdempotencyKey(r.Header.Get("Idempotency-Key")))

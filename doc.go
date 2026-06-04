@@ -14,11 +14,13 @@
 //
 // # Producing
 //
-//	client := queue.NewClient()
-//	_, err := Emails.Send(ctx, client, EmailPayload{To: "a@b.com"},
+//	_, err := Emails.Send(ctx, EmailPayload{To: "a@b.com"},
 //		queue.WithDelay(time.Minute),
 //		queue.WithIdempotencyKey("k1"),
 //	)
+//
+// Pass the inbound request's context so the Vercel OIDC token is used; wrap the
+// producer's handler with [Middleware].
 //
 // # Consuming
 //

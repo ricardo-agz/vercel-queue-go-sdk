@@ -8,8 +8,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/vercel/queue-go"
-	"github.com/vercel/queue-go/examples/orders/topics"
+	queue "github.com/ricardo-agz/vercel-queue-go-sdk"
+	"github.com/ricardo-agz/vercel-queue-go-sdk/examples/orders/topics"
 )
 
 func main() {

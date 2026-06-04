@@ -94,6 +94,15 @@ func NewClient(opts ...ClientOption) *Client {
 	return c
 }
 
+// defaultClient is the package-level client used by [Topic.Send]. It is
+// configured entirely from the environment and resolves its auth token per call
+// from the context, so a single shared instance is safe for concurrent use.
+var defaultClient = NewClient()
+
+// DefaultClient returns the shared client used by [Topic.Send]. Use it to call
+// the low-level [Client.Send] without constructing your own client.
+func DefaultClient() *Client { return defaultClient }
+
 // resolvedToken returns the token for this client, considering an explicit
 // client token, a per-request token carried on ctx, then the environment.
 func (c *Client) resolvedToken(ctx context.Context) (string, error) {
