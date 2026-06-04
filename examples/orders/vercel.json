@@ -1,0 +1,19 @@
+{
+  "experimentalServices": {
+    "web": {
+      "runtime": "go",
+      "entrypoint": "cmd/server/main.go",
+      "mount": "/"
+    },
+    "worker": {
+      "type": "job",
+      "trigger": "queue",
+      "runtime": "go",
+      "entrypoint": "cmd/worker/main.go",
+      "topics": [
+        { "topic": "emails", "retryAfterSeconds": 60, "initialDelaySeconds": 0 },
+        { "topic": "reports", "retryAfterSeconds": 300 }
+      ]
+    }
+  }
+}
