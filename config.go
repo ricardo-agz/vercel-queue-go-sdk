@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -58,10 +59,19 @@ func resolveBasePath(override string) string {
 }
 
 // resolveToken resolves the bearer token used to authenticate with the Queue
-// Service. Order: explicit override, VERCEL_QUEUE_TOKEN, VERCEL_OIDC_TOKEN.
-func resolveToken(override string) (string, error) {
+// Service.
+//
+// Order: explicit override, a per-request token carried on ctx (the Vercel OIDC
+// token extracted from the inbound X-Vercel-Oidc-Token header), the
+// VERCEL_QUEUE_TOKEN env var (set by `vercel dev`), then the VERCEL_OIDC_TOKEN
+// env var. VERCEL_OIDC_TOKEN is only present at build time on Vercel, so in
+// production the ctx token is the credential that actually authenticates.
+func resolveToken(ctx context.Context, override string) (string, error) {
 	if override != "" {
 		return override, nil
+	}
+	if v := tokenFromContext(ctx); v != "" {
+		return v, nil
 	}
 	if v := os.Getenv(envQueueToken); v != "" {
 		return v, nil

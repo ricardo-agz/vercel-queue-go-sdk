@@ -170,6 +170,13 @@ func (m *ServeMux) dispatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+	// Thread the inbound callback's Vercel OIDC token (X-Vercel-Oidc-Token) into
+	// the context so the metadata fetch, the handler, and the lease operations
+	// below authenticate with the per-request credential. VERCEL_OIDC_TOKEN is
+	// only populated at build time, so this header is what works at runtime.
+	if token := OIDCTokenFromRequest(r); token != "" {
+		ctx = ContextWithToken(ctx, token)
+	}
 
 	// Resolve the payload + receipt handle. Metadata-only callbacks require a
 	// follow-up fetch.
@@ -195,6 +202,7 @@ func (m *ServeMux) dispatch(w http.ResponseWriter, r *http.Request) {
 		consumer:      pc.consumer,
 		messageID:     pc.messageID,
 		receiptHandle: receipt,
+		token:         tokenFromContext(ctx),
 	}
 
 	extender := newVisibilityExtender(l, m.visibilityTimeout, m.refreshInterval)

@@ -28,6 +28,10 @@ type lease struct {
 	consumer      string
 	messageID     string
 	receiptHandle string
+	// token is the per-request auth token (e.g. the Vercel OIDC token from the
+	// callback request). It is used for background lease extensions, whose
+	// context would otherwise carry no credential.
+	token string
 }
 
 // ack deletes the message, acknowledging successful processing.
@@ -163,7 +167,11 @@ func (v *visibilityExtender) start() {
 			case <-v.stop:
 				return
 			case <-t.C:
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				base := context.Background()
+				if v.lease.token != "" {
+					base = ContextWithToken(base, v.lease.token)
+				}
+				ctx, cancel := context.WithTimeout(base, 10*time.Second)
 				err := v.lease.extend(ctx, v.timeout)
 				cancel()
 				if err != nil {

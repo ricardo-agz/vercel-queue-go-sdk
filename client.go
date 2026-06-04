@@ -94,9 +94,10 @@ func NewClient(opts ...ClientOption) *Client {
 	return c
 }
 
-// resolvedToken returns the token for this client, falling back to env lookup.
-func (c *Client) resolvedToken() (string, error) {
-	return resolveToken(c.token)
+// resolvedToken returns the token for this client, considering an explicit
+// client token, a per-request token carried on ctx, then the environment.
+func (c *Client) resolvedToken(ctx context.Context) (string, error) {
+	return resolveToken(ctx, c.token)
 }
 
 func (c *Client) topicURL(topic string) string {
@@ -119,7 +120,7 @@ func (c *Client) messageURL(topic, consumer, messageID string) string {
 
 // newRequest builds an authenticated request with default headers applied.
 func (c *Client) newRequest(ctx context.Context, method, url string, body []byte) (*http.Request, error) {
-	token, err := c.resolvedToken()
+	token, err := c.resolvedToken(ctx)
 	if err != nil {
 		return nil, err
 	}

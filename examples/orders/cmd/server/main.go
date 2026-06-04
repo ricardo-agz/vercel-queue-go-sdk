@@ -40,7 +40,10 @@ func main() {
 
 	addr := ":" + envOr("PORT", "3000")
 	log.Printf("web listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	// queue.Middleware copies the inbound request's Vercel OIDC token into the
+	// request context so Send (called with r.Context()) authenticates without
+	// any per-request client wiring.
+	log.Fatal(http.ListenAndServe(addr, queue.Middleware(http.DefaultServeMux)))
 }
 
 const indexHTML = `<!doctype html>
