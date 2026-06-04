@@ -94,12 +94,16 @@ Only the consumer (worker) service declares topics; the producer just publishes.
 ```json
 {
   "experimentalServices": {
-    "web":    { "runtime": "go", "entrypoint": "./cmd/server", "route": "/" },
+    "web":    { 
+      "runtime": "go", 
+      "entrypoint": "cmd/server/main.go", 
+      "route": "/" 
+    },
     "worker": {
       "type": "job",
       "trigger": "queue",
       "runtime": "go",
-      "entrypoint": "./cmd/worker",
+      "entrypoint": "cmd/worker/main.go",
       "topics": [
         { "topic": "emails",  "retryAfterSeconds": 60 },
         { "topic": "reports", "retryAfterSeconds": 300 }
@@ -110,10 +114,3 @@ Only the consumer (worker) service declares topics; the producer just publishes.
 ```
 
 See [`examples/orders`](./examples/orders) for a complete producer + worker setup.
-
-## Environment
-
-The SDK reads standard Vercel runtime variables: `VERCEL_QUEUE_TOKEN` /
-`VERCEL_OIDC_TOKEN` (auth), `VERCEL_QUEUE_BASE_URL` / `VERCEL_REGION`
-(endpoint), `VERCEL_DEPLOYMENT_ID` (deployment pinning), and `PORT` (worker
-listen port).
